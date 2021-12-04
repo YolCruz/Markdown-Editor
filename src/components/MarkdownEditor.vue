@@ -10,218 +10,22 @@ const emits = defineEmits<{
   (event: "update", val: string): void
 }>()
 
-interface textClass {
-  value: string;
-  text: string;
-  id: string;
-}
-
-interface textClasses {
-  [name: string]: textClass
-}
-
-interface Cursor {
-  start: number;
-  end: number;
-}
-
-interface History {
-  text: string;
-  cursorPosition: Cursor;
-}
-
-let position = 0
-let cursorPosition: Cursor = {
-  start: 0,
-  end: 0
-}
 const text = ref(props.text)
-let historyText: History[] = [
-  { text: props.text, cursorPosition }
-]
-const selected = ref("Normal")
 
-const textClasses: textClasses = {
-  "Normal": {
-    value: "Normal",
-    text: "",
-    id: "n",
-  },
-  "Header 1": {
-    value: "Header 1",
-    text: "# ",
-    id: "h1",
-  },
-  "Header 2": {
-    value: "Header 2",
-    text: "## ",
-    id: "h2",
-  },
-  "Header 3": {
-    value: "Header 3",
-    text: "### ",
-    id: "h3",
-  },
-  "Header 4": {
-    value: "Header 4",
-    text: "#### ",
-    id: "h4",
-  }
-}
-
-function updateCursor() {
-  const target = document.getElementById("textInput") as HTMLTextAreaElement;
-  if (target) {
-    console.log(target.selectionStart)
-    console.log(target.selectionEnd)
-    cursorPosition = {
-      start: target.selectionStart,
-      end: target.selectionEnd
-    }
-  }
-}
-
-function reFocus(t: HTMLTextAreaElement) {
-  t.focus()
-  setTimeout(() => t.setSelectionRange(cursorPosition.start, cursorPosition.end));
-}
-
-function addHighlight(h: string) {
-  const target = document.getElementById("textInput") as HTMLTextAreaElement;
-  if (target) {
-    const s = cursorPosition.start;
-    const e = cursorPosition.end;
-    const currentText = historyText[position].text
-    const newText = [
-      currentText.substring(0, s),
-      h,
-      currentText.substring(s, e),
-      h,
-      currentText.substring(e)
-    ].join("")
-    cursorPosition = {
-      start: s + h.length,
-      end: s + h.length
-    }
-    historyText = [
-      ...historyText,
-      { text: newText, cursorPosition }
-    ]
-    text.value = newText
-    emitText(1)
-    reFocus(target)
-  }
-}
-
-function changeLine() {
-  const target = document.getElementById("textInput") as HTMLTextAreaElement
-  if (target) {
-    const s = target.selectionStart;
-    const currentText = historyText[position].text
-    const firstN = currentText.substring(0, s).lastIndexOf("\n") + 1
-    const lastNSearch = currentText.substring(s).indexOf("\n")
-    const lastN = lastNSearch > 0 ? lastNSearch : currentText.length
-
-    const line = currentText.substring(firstN, lastN)
-    const addedText = textClasses[selected.value].text
-    const searcher = /^#+ /
-    const lineStart = line.match(searcher)?.[0].length ?? 0
-
-    let newLine = "";
-    if (addedText.length === lineStart) {
-      newLine = line.replace(searcher, "")
-    } else if (lineStart > 0) {
-      newLine = line.replace(searcher, addedText)
-    } else {
-      newLine = addedText + line
-    }
-
-    const newText = [
-      currentText.substring(0, firstN),
-      newLine,
-      currentText.substring(lastN),
-    ].join("");
-
-    cursorPosition = {
-      start: s + (addedText.length - lineStart),
-      end: s + (addedText.length - lineStart)
-    }
-    historyText = [
-      ...historyText,
-      { text: newText, cursorPosition }
-    ]
-    text.value = newText
-    emitText(1)
-    reFocus(target)
-  }
-}
-
-function changeLineKey(h: string) {
-  selected.value = h
-  setTimeout(() => changeLine(),)
-}
-
-function un_reDo(t: number) {
-  const next = historyText[position + t]
-  if (next) {
-    emitText(t)
-  }
-}
-
-function updateText(): void {
-  historyText = [
-    ...historyText,
-    { text: text.value, cursorPosition }
-  ]
-  emitText(1)
-}
-
-function emitText(val: number) {
-  position += val
-  text.value = historyText[position].text
-  cursorPosition = historyText[position].cursorPosition
-
-  const target = document.getElementById("textInput") as HTMLTextAreaElement;
-  if (target) {
-    reFocus(target)
-  }
+function emitText() {
   emits("update", text.value)
 }
 </script>
 
 <template>
   <div id="containerMarkdown">
-    <div id="buttons">
-      <a href="#" class="editorButton" @click="addHighlight('**'), updateText()">
-        <b>B</b>
-      </a>
-      <a href="#" class="editorButton" @click="addHighlight('*')">
-        <i>I</i>
-      </a>
-      <select name="Text" id="textSelection" v-model="selected" @change="changeLine()">
-        <option v-for="textClass in textClasses" :key="textClass.id">{{ textClass.value }}</option>
-      </select>
-    </div>
     <textarea
       id="textInput"
       rows="15"
       cols="100"
       placeholder="Enter some text..."
       v-model="text"
-      @input="updateText"
-      @keyup.left="updateCursor"
-      @keyup.right="updateCursor"
-      @keyup.up="updateCursor"
-      @keyup.down="updateCursor"
-      @mouseup="updateCursor"
-      @keydown.ctrl.z.exact.prevent="un_reDo(-1)"
-      @keydown.ctrl.y.exact.prevent="un_reDo(1)"
-      @keydown.ctrl.b.exact.prevent="addHighlight('**')"
-      @keydown.ctrl.i.exact.prevent="addHighlight('*')"
-      @keydown.ctrl.1.exact.prevent="changeLineKey('Header 1')"
-      @keydown.ctrl.2.exact.prevent="changeLineKey('Header 2')"
-      @keydown.ctrl.3.exact.prevent="changeLineKey('Header 3')"
-      @keydown.ctrl.4.exact.prevent="changeLineKey('Header 4')"
+      @input="emits('update', text)"
     />
   </div>
 </template>
